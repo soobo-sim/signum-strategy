@@ -1,0 +1,150 @@
+name: CD Docker
+
+# 자동 트리거: feature/v* → release/v* PR 머지 시
+# 수동 실행:   Actions > CD Docker > Run workflow (release/vX.Y 브랜치 선택)
+#
+# 흐름 (자동):
+#   feature/vX.Y → release/vX.Y merge
+#     → Docker 이미지 빌드 + ghcr.io vX.Y 등록
+#     → 성공 시 release/vX.Y → main 자동 PR 생성 & 머지
+#     → cleanup-after-main-merge.yml 이 다음 브랜치 생성
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - 'release/v*'
+  workflow_dispatch:
+    inputs:
+      deploy_env:
+        description: 'Deploy target/environment label'
+        required: false
+        default: 'production'
+        type: string
+      release_version_override:
+        description: 'Optional override version tag (e.g. v0.1). Empty = derived from release branch.'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  cd:
+    name: Build, push registry & release to main
+    if: >
+      github.event_name == 'workflow_dispatch' || (
+        github.event.pull_request.merged == true &&
+        startsWith(github.event.pull_request.head.ref, 'feature/v')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ github.event.inputs.deploy_env || 'production' }}
+    permissions:
+      contents: write
+      packages: write
+      pull-requests: write
+
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Resolve release branch and version
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            RELEASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          else
+            RELEASE_BRANCH="${{ github.ref_name }}"
+          fi
+
+          if ! echo "$RELEASE_BRANCH" | grep -qE '^release/v[0-9]+\.[0-9]+$'; then
+            echo "❌ Not a managed release branch: $RELEASE_BRANCH"
+            exit 1
+          fi
+
+          BRANCH_TAG=$(echo "$RELEASE_BRANCH" | sed -E 's|^release/(v[0-9]+\.[0-9]+)$|\1|')
+          OVERRIDE="${{ github.event.inputs.release_version_override }}"
+
+          if [ -n "$OVERRIDE" ]; then
+            TAG="$OVERRIDE"
+          else
+            TAG="$BRANCH_TAG"
+          fi
+
+          if ! echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+$'; then
+            echo "❌ Invalid version format: $TAG"
+            exit 1
+          fi
+
+          echo "release_branch=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
+          echo "version=$TAG"                   >> $GITHUB_OUTPUT
+          echo "image=ghcr.io/${{ github.repository }}:${TAG}" >> $GITHUB_OUTPUT
+          echo "🚀 CD: $TAG from $RELEASE_BRANCH"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.release_branch }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push release image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: APP_VERSION=${{ steps.meta.outputs.version }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
+          labels: |
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify image in registry
+        shell: bash
+        run: |
+          docker manifest inspect "${{ steps.meta.outputs.image }}" > /dev/null
+          echo "✅ Image verified: ${{ steps.meta.outputs.image }}"
+
+      - name: Merge release to main
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        shell: bash
+        run: |
+          RELEASE_BRANCH="${{ steps.meta.outputs.release_branch }}"
+          VERSION="${{ steps.meta.outputs.version }}"
+
+          EXISTING=$(gh pr list --head "$RELEASE_BRANCH" --base main \
+            --json number --jq '.[0].number' 2>/dev/null)
+
+          if [ -z "$EXISTING" ]; then
+            gh pr create \
+              --base main \
+              --head "$RELEASE_BRANCH" \
+              --title "[release] ${VERSION} → main" \
+              --body "Automated release merge after successful CD."
+            PR_NUM=$(gh pr list --head "$RELEASE_BRANCH" --base main \
+              --json number --jq '.[0].number')
+          else
+            PR_NUM=$EXISTING
+          fi
+
+          gh pr merge "$PR_NUM" --merge
+          echo "✅ Merged $RELEASE_BRANCH → main (PR #${PR_NUM})"

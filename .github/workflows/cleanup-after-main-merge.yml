@@ -1,0 +1,127 @@
+name: Cleanup After Main Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  branch-cycle:
+    name: Cleanup merged release + create next branches
+    if: >
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version info
+        id: meta
+        shell: bash
+        run: |
+          RELEASE_BRANCH="${{ github.event.pull_request.head.ref }}"
+
+          if ! echo "$RELEASE_BRANCH" | grep -qE '^release/v[0-9]+\.[0-9]+$'; then
+            echo "Not a managed release branch: $RELEASE_BRANCH"
+            exit 1
+          fi
+
+          VERSION=$(echo "$RELEASE_BRANCH" | sed -E 's|^release/v([0-9]+\.[0-9]+)$|\1|')
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          NEXT_MINOR=$((MINOR + 1))
+          NEXT_VERSION="${MAJOR}.${NEXT_MINOR}"
+
+          echo "release_branch=${RELEASE_BRANCH}" >> $GITHUB_OUTPUT
+          echo "release_version=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "feature_branch=feature/v${VERSION}" >> $GITHUB_OUTPUT
+          echo "next_release=release/v${NEXT_VERSION}" >> $GITHUB_OUTPUT
+          echo "next_feature=feature/v${NEXT_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Delete merged release and matching feature branch
+        shell: bash
+        run: |
+          RELEASE_BRANCH="${{ steps.meta.outputs.release_branch }}"
+          FEATURE_BRANCH="${{ steps.meta.outputs.feature_branch }}"
+
+          if git ls-remote --heads origin "$RELEASE_BRANCH" | grep -q "refs/heads/${RELEASE_BRANCH}$"; then
+            git push origin --delete "$RELEASE_BRANCH"
+            echo "✅ Deleted release branch: $RELEASE_BRANCH"
+          else
+            echo "ℹ️ Release branch not found (already deleted): $RELEASE_BRANCH"
+          fi
+
+          if git ls-remote --heads origin "$FEATURE_BRANCH" | grep -q "refs/heads/${FEATURE_BRANCH}$"; then
+            git push origin --delete "$FEATURE_BRANCH"
+            echo "✅ Deleted feature branch: $FEATURE_BRANCH"
+          else
+            echo "ℹ️ Feature branch not found (skip): $FEATURE_BRANCH"
+          fi
+
+      - name: Create next release and feature branches from main
+        shell: bash
+        run: |
+          NEXT_RELEASE="${{ steps.meta.outputs.next_release }}"
+          NEXT_FEATURE="${{ steps.meta.outputs.next_feature }}"
+
+          git config user.email "ci@signum-adapters.bot"
+          git config user.name "CI Bot"
+
+          git fetch origin main
+          git checkout -B main origin/main
+
+          if git ls-remote --heads origin "$NEXT_RELEASE" | grep -q "refs/heads/${NEXT_RELEASE}$"; then
+            echo "ℹ️ Branch exists: $NEXT_RELEASE"
+          else
+            git checkout -b "$NEXT_RELEASE" main
+            git push origin "$NEXT_RELEASE"
+            echo "✅ Created: $NEXT_RELEASE"
+            git checkout main
+          fi
+
+          if git ls-remote --heads origin "$NEXT_FEATURE" | grep -q "refs/heads/${NEXT_FEATURE}$"; then
+            echo "ℹ️ Branch exists: $NEXT_FEATURE"
+          else
+            git checkout -b "$NEXT_FEATURE" main
+            git push origin "$NEXT_FEATURE"
+            echo "✅ Created: $NEXT_FEATURE"
+            git checkout main
+          fi
+
+      - name: Post release summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const releaseVersion = "${{ steps.meta.outputs.release_version }}";
+            const releaseBranch = "${{ steps.meta.outputs.release_branch }}";
+            const featureBranch = "${{ steps.meta.outputs.feature_branch }}";
+            const nextRelease = "${{ steps.meta.outputs.next_release }}";
+            const nextFeature = "${{ steps.meta.outputs.next_feature }}";
+            const pr = context.payload.pull_request;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: [
+                `## ✅ Cleanup after main merge complete: \`${releaseVersion}\``,
+                ``,
+                `| 항목 | 결과 |`,
+                `|------|------|`,
+                `| 머지된 release 브랜치 | \`${releaseBranch}\` |`,
+                `| 정리된 feature 브랜치 | \`${featureBranch}\` (있으면 삭제) |`,
+                `| 다음 릴리즈 브랜치 | \`${nextRelease}\` |`,
+                `| 다음 피처 브랜치 | \`${nextFeature}\` |`,
+                ``,
+                `> 새 feature 브랜치를 push하면 Auto PR 워크플로우가 release 브랜치 PR을 생성합니다.`,
+              ].join('\n'),
+            });

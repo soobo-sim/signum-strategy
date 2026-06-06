@@ -1,0 +1,64 @@
+name: Auto PR
+
+on:
+  push:
+    branches:
+      - 'feature/v*'
+
+jobs:
+  create-pr:
+    name: Create PR if not exists
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      # GITHUB_TOKEN으로 생성한 PR은 일부 이벤트 트리거가 제한될 수 있어
+      # GitHub App 토큰을 사용한다.
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+
+          if ! echo "$BRANCH" | grep -qE '^feature/v[0-9]+\.[0-9]+(_[a-z0-9][a-z0-9\-]*)?$'; then
+            echo "Not a managed feature branch: $BRANCH - skip"
+            exit 0
+          fi
+
+          VERSION=$(echo "$BRANCH" | sed -E 's|^feature/(v[0-9]+\.[0-9]+).*$|\1|')
+          BASE_BRANCH="release/${VERSION}"
+
+          if ! git ls-remote --exit-code origin "$BASE_BRANCH" > /dev/null 2>&1; then
+            echo "Base branch '$BASE_BRANCH' does not exist on remote — skip"
+            exit 0
+          fi
+
+          EXISTING=$(gh pr list --head "$BRANCH" --base "$BASE_BRANCH" \
+            --json number --jq '.[0].number' 2>/dev/null)
+          if [ -n "$EXISTING" ]; then
+            echo "PR already exists: #${EXISTING} — skip"
+            exit 0
+          fi
+
+          TITLE="[feat] ${VERSION} -> ${BASE_BRANCH}"
+
+          gh pr create \
+            --title "$TITLE" \
+            --body "$(cat .github/PULL_REQUEST_TEMPLATE.md 2>/dev/null || echo 'PR 설명을 작성해주세요.')" \
+            --base "$BASE_BRANCH" \
+            --head "$BRANCH"
+
+          echo "✅ PR created: $BRANCH → $BASE_BRANCH"
