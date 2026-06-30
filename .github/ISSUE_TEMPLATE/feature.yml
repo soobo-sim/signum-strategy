@@ -1,0 +1,54 @@
+name: Feature
+description: 배포 가능한 기능 단위를 정의합니다 (BRD 기반, 2~5일 작업 기준).
+title: "[Feature] "
+labels:
+  - type:feature
+body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 우선순위
+      options:
+        - P1 — 즉시 구현 (핵심 기능)
+        - P2 — 다음 단계
+        - P3 — 검토 중
+    validations:
+      required: true
+
+  - type: input
+    id: brd_goal
+    attributes:
+      label: BRD 목표 (Goal ID)
+      placeholder: "예: G1, G2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 기능 요약
+      description: 이 Feature가 무엇을 달성하는지 한 문장으로.
+      placeholder: "예: 4H 캔들 백필 API — 누락된 구간을 GMO Coin 퍼블릭 API로 채운다"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: 인수 조건
+      description: 테스트 가능한 조건으로 작성 (1개 이상 필수).
+      placeholder: |
+        1. GET /api/candles/backfill 엔드포인트가 200을 반환한다
+        2. 누락 구간이 DB에 채워진다
+        3. 중복 캔들은 upsert 처리된다
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 영향 범위
+      description: 수정될 파일, 테이블, API 엔드포인트 등.
+      placeholder: |
+        - app/routes/candles.py
+        - gmoc_candles 테이블

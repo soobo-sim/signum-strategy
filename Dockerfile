@@ -13,7 +13,4 @@ WORKDIR /app
 # Copy built wheel so downstream images can COPY --from=... /dist/*.whl
 COPY --from=builder /build/dist/ /dist/
 
-# Install the package
-RUN pip install --no-cache-dir /dist/*.whl
-
 LABEL org.opencontainers.image.source="https://github.com/soobo-sim/signum-strategy"

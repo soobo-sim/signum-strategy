@@ -1,4 +1,4 @@
-name: Cleanup After Main Merge
+name: Next Branch Creation
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   branch-cycle:
-    name: Cleanup merged release + create next branches
+    name: Create next release and feature branches
     if: >
       github.event.pull_request.merged == true &&
       startsWith(github.event.pull_request.head.ref, 'release/v')
@@ -46,26 +46,6 @@ jobs:
           echo "feature_branch=feature/v${VERSION}" >> $GITHUB_OUTPUT
           echo "next_release=release/v${NEXT_VERSION}" >> $GITHUB_OUTPUT
           echo "next_feature=feature/v${NEXT_VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Delete merged release and matching feature branch
-        shell: bash
-        run: |
-          RELEASE_BRANCH="${{ steps.meta.outputs.release_branch }}"
-          FEATURE_BRANCH="${{ steps.meta.outputs.feature_branch }}"
-
-          if git ls-remote --heads origin "$RELEASE_BRANCH" | grep -q "refs/heads/${RELEASE_BRANCH}$"; then
-            git push origin --delete "$RELEASE_BRANCH"
-            echo "✅ Deleted release branch: $RELEASE_BRANCH"
-          else
-            echo "ℹ️ Release branch not found (already deleted): $RELEASE_BRANCH"
-          fi
-
-          if git ls-remote --heads origin "$FEATURE_BRANCH" | grep -q "refs/heads/${FEATURE_BRANCH}$"; then
-            git push origin --delete "$FEATURE_BRANCH"
-            echo "✅ Deleted feature branch: $FEATURE_BRANCH"
-          else
-            echo "ℹ️ Feature branch not found (skip): $FEATURE_BRANCH"
-          fi
 
       - name: Create next release and feature branches from main
         shell: bash
@@ -113,12 +93,11 @@ jobs:
               repo: context.repo.repo,
               issue_number: pr.number,
               body: [
-                `## ✅ Cleanup after main merge complete: \`${releaseVersion}\``,
+                `## ✅ Next branch creation complete: \`${releaseVersion}\``,
                 ``,
                 `| 항목 | 결과 |`,
                 `|------|------|`,
                 `| 머지된 release 브랜치 | \`${releaseBranch}\` |`,
-                `| 정리된 feature 브랜치 | \`${featureBranch}\` (있으면 삭제) |`,
                 `| 다음 릴리즈 브랜치 | \`${nextRelease}\` |`,
                 `| 다음 피처 브랜치 | \`${nextFeature}\` |`,
                 ``,
