@@ -19,10 +19,17 @@ jobs:
       issues: write
 
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Extract version info
         id: meta
@@ -53,8 +60,11 @@ jobs:
           NEXT_RELEASE="${{ steps.meta.outputs.next_release }}"
           NEXT_FEATURE="${{ steps.meta.outputs.next_feature }}"
 
-          git config user.email "ci@signum-adapters.bot"
-          git config user.name "CI Bot"
+          git config user.email "ci@lazenca.bot"
+          git config user.name "Lazenca CI"
+
+          REMOTE_URL="https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}.git"
+          git remote set-url origin "$REMOTE_URL"
 
           git fetch origin main
           git checkout -B main origin/main

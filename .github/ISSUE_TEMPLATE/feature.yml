@@ -1,54 +1,116 @@
-name: Feature
-description: 배포 가능한 기능 단위를 정의합니다 (BRD 기반, 2~5일 작업 기준).
-title: "[Feature] "
+name: "📋 Feature"
+description: "📦 Epic의 하위 기능 단위 — 배포 가능한 독립 기능. 2~5일 작업 기준."
+title: "[Feature] F?: "
 labels:
   - type:feature
 body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📋 Feature 이슈란?
+
+        Feature는 **하나의 Epic을 구성하는 독립적인 기능 단위**입니다.
+        Epic보다 작고 User Story보다 크며, 하나의 릴리즈에서 완성될 수 있는 규모입니다.
+
+        ```
+        🏔️ Epic        ← 상위 이슈 (큰 목표)
+          └── 📋 Feature   ← 지금 작성하는 이슈  (독립 기능 단위)
+                └── 📝 User Story  ← 이 Feature를 구현하는 PR 단위 작업
+        ```
+
+        > **작성 팁** — Feature 제목은 "무엇을 구현하는가"로 쓰세요.
+        > - ✅ "Domain 타입 패키지 (`app/domain/`)"
+        > - ✅ "Reader 계약 + 구현체 5종"
+        > - ❌ "타입 추가" (너무 막연)
+
+  - type: input
+    id: epic_issue
+    attributes:
+      label: "🏔️ 상위 Epic Issue #"
+      description: "이 Feature가 속하는 Epic 이슈 번호를 입력하세요. Epic 이슈를 먼저 만들어야 합니다."
+      placeholder: "예: #5"
+    validations:
+      required: true
+
   - type: dropdown
     id: priority
     attributes:
-      label: 우선순위
+      label: "📊 우선순위"
+      description: "P1이 가장 먼저 구현합니다. P1이 완성되어야 P2를 시작할 수 있습니다."
       options:
-        - P1 — 즉시 구현 (핵심 기능)
-        - P2 — 다음 단계
-        - P3 — 검토 중
+        - "P1 — 🔴 즉시 구현 (핵심 기능 — 이것 없으면 후속 Feature 불가)"
+        - "P2 — 🟡 다음 단계 (구조 안정 후 즉시 착수)"
+        - "P3 — 🟢 검토 중 (기반 완성 후 추가)"
     validations:
       required: true
 
   - type: input
     id: brd_goal
     attributes:
-      label: BRD 목표 (Goal ID)
-      placeholder: "예: G1, G2"
+      label: "🎯 BRD 목표 연결 (Goal ID)"
+      description: "이 Feature가 달성하는 BRD Goal 번호. BRD.md §4에서 확인하세요."
+      placeholder: "예: G2, G4"
+    validations:
+      required: true
+
+  - type: textarea
+    id: background
+    attributes:
+      label: "🔍 배경 — 왜 지금 이 기능이 필요한가?"
+      description: |
+        현재 어떤 문제가 있고, 이 Feature가 없으면 어떤 불편함이 생기는지 설명하세요.
+        "지금은 ~해서 문제다. 이 Feature가 있으면 ~할 수 있다" 형식이 좋습니다.
+      placeholder: |
+        지금 데이터 타입들이 SQLAlchemy ORM 모델에 묶여 있어서,
+        Mapper나 Store를 테스트하려면 항상 실제 DB가 필요합니다.
+
+        이 Feature로 순수 Python dataclass를 분리하면
+        DB 없이도 각 계층을 독립적으로 테스트할 수 있습니다.
     validations:
       required: true
 
   - type: textarea
     id: summary
     attributes:
-      label: 기능 요약
-      description: 이 Feature가 무엇을 달성하는지 한 문장으로.
-      placeholder: "예: 4H 캔들 백필 API — 누락된 구간을 GMO Coin 퍼블릭 API로 채운다"
+      label: "📌 목표 상태 — 완료 후 무엇이 달라지는가?"
+      description: "Before → After 형식으로 변화를 간결하게 적어주세요."
+      placeholder: |
+        Before: 데이터 타입이 SQLAlchemy ORM 모델 내부에 혼재
+        After:  app/domain/ 독립 패키지로 분리, sqlalchemy import 0건
+
+        완료 후: from app.domain.records import CandleRecord 가 오류 없이 실행된다.
     validations:
       required: true
 
   - type: textarea
     id: acceptance_criteria
     attributes:
-      label: 인수 조건
-      description: 테스트 가능한 조건으로 작성 (1개 이상 필수).
+      label: "✅ 인수 조건 (Acceptance Criteria)"
+      description: |
+        테스트로 확인할 수 있는 조건을 번호 목록으로 작성하세요.
+        조건은 반드시 "~한다" 형식으로 끝내세요 — 모호한 표현은 금지입니다.
+        예) ✅ "from app.domain.records import CandleRecord 가 오류 없이 실행된다"
+            ❌ "domain 타입이 잘 작동한다"
       placeholder: |
-        1. GET /api/candles/backfill 엔드포인트가 200을 반환한다
-        2. 누락 구간이 DB에 채워진다
-        3. 중복 캔들은 upsert 처리된다
+        1. CandleRecord, NewsRecord, SentimentRecord, EconomicEventRecord, MacroPoint dataclass가 domain/records.py에 존재한다.
+        2. CollectorStatus, CollectResult dataclass가 domain/status.py에 존재한다.
+        3. domain/ 내 어떤 파일도 sqlalchemy, fastapi, httpx를 import하지 않는다.
+        4. from app.domain.records import CandleRecord 가 오류 없이 실행된다.
     validations:
       required: true
 
   - type: textarea
     id: scope
     attributes:
-      label: 영향 범위
-      description: 수정될 파일, 테이블, API 엔드포인트 등.
+      label: "🗂️ 영향 범위 (파일 / 테이블 / API 엔드포인트)"
+      description: "새로 생성되거나 수정될 파일, DB 테이블, API 엔드포인트를 나열하세요."
       placeholder: |
-        - app/routes/candles.py
-        - gmoc_candles 테이블
+        신규 생성:
+        - app/domain/__init__.py
+        - app/domain/records.py  (CandleRecord, NewsRecord 등)
+        - app/domain/status.py   (CollectorStatus, CollectResult)
+        - app/domain/queries.py  (NewsQuery)
+
+        수정 없음 — 이 Feature는 기존 파일 수정 없이 신규 추가만 합니다.
+    validations:
+      required: false
