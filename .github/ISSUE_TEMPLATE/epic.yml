@@ -1,0 +1,102 @@
+name: "🏔️ Epic"
+description: "🗂️ 여러 Feature를 묶는 대규모 목표 단위 — BRD Epic 기반, 1~2주 작업 기준"
+title: "[Epic] E?: "
+labels:
+  - type:epic
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🏔️ Epic 이슈란?
+
+        Epic은 **여러 Feature(기능)를 묶는 큰 목표 덩어리**입니다.
+        혼자서는 완성되지 않고, 하위 Feature 이슈들이 모두 완료되어야 Epic이 닫힙니다.
+
+        ```
+        🏔️ Epic        ← 지금 작성하는 이슈  (큰 목표 — "무엇을 통일/분리/제거하는가")
+          └── 📋 Feature   ← 이 Epic을 구성하는 기능 단위 이슈
+                └── 📝 User Story  ← Feature를 구현하는 PR 단위 작업
+        ```
+
+        > **작성 팁** — Epic 제목은 아래처럼 "무엇을 통일/분리/제거하는가"로 쓰세요.
+        > - ✅ "수집기 생명주기 통합 (CollectorRegistry)"
+        > - ✅ "데이터 계층 분리 (Source · Mapper · Store · Reader)"
+        > - ❌ "리팩터링" (너무 막연)
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "📊 우선순위"
+      description: "이 Epic의 착수 순서입니다. P1이 가장 먼저입니다."
+      options:
+        - "P1 — 🔴 즉시 착수 (구조 기반 — 이것 없으면 후속 작업 불가)"
+        - "P2 — 🟡 다음 단계 (구조 안정 후 즉시 착수)"
+        - "P3 — 🟢 선택 (기반 완성 후 추가 시 효과)"
+    validations:
+      required: true
+
+  - type: input
+    id: brd_goal
+    attributes:
+      label: "🎯 BRD 목표 연결 (Goal ID)"
+      description: "이 Epic이 해결하는 BRD Goal 번호. BRD.md §4에서 확인하세요."
+      placeholder: "예: G1, G3"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "📌 한 줄 목표 — Epic 완료 후 무엇이 달라지는가?"
+      description: "이 Epic이 완료되면 어떤 상태가 되는지 한 문장으로 써주세요."
+      placeholder: |
+        예: 5개 수집기를 registry.start_all() / stop_all() 한 줄로 제어할 수 있게 되어,
+            main.py 수정 없이 새 수집기를 추가할 수 있다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: background
+    attributes:
+      label: "🔍 배경 — 왜 지금 이 Epic이 필요한가?"
+      description: |
+        현재 어떤 문제가 있고, 방치하면 어떤 영향이 생기는지 써주세요.
+        "현재 상황 → 문제 → 이 Epic이 없으면" 순서로 쓰면 읽기 쉽습니다.
+      placeholder: |
+        현재 상황:
+        - main.py lifespan에 수집기마다 try/except 블록이 5번 반복되어 있다.
+        - 새 수집기 추가 시 main.py를 반드시 수정해야 한다.
+
+        방치하면:
+        - 진입점 파일이 거대해지고 실수로 기존 블록을 망가뜨릴 위험이 있다.
+        - 수집기 전체 상태를 한 곳에서 조회하는 방법이 없다.
+    validations:
+      required: false
+
+  - type: textarea
+    id: features
+    attributes:
+      label: "📋 포함 Feature 목록"
+      description: |
+        이 Epic을 구성하는 Feature 이슈들을 나열하세요.
+        Feature 이슈 생성 전이라면 Feature ID(F1, F2...)만 적어도 됩니다.
+        Feature 이슈가 생성되면 이 목록에 #번호를 추가하세요.
+      placeholder: |
+        - [ ] F2: 수집 계약 Protocol 정의 (`app/collector/contracts.py`) — #?
+        - [ ] F3: ScheduledCollector 범용 조립체 — #?
+        - [ ] F4: 표준 CollectorRegistry 구현 — #?
+    validations:
+      required: true
+
+  - type: textarea
+    id: done_criteria
+    attributes:
+      label: "✅ 완료 기준 (Definition of Done)"
+      description: "이 Epic이 완료됐다고 판단할 수 있는 구체적인 기준을 체크리스트로 작성하세요."
+      placeholder: |
+        - [ ] 모든 하위 Feature 이슈가 closed 상태
+        - [ ] registry.start_all() / stop_all() 한 줄로 5개 수집기 전체 제어 가능
+        - [ ] GET /api/status 로 모든 수집기 상태 조회 가능
+        - [ ] pytest tests/ -m "not requires_api_key" 전체 통과
+    validations:
+      required: true

@@ -1,4 +1,4 @@
-name: Cleanup After Main Merge
+name: Next Branch Creation
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   branch-cycle:
-    name: Cleanup merged release + create next branches
+    name: Create next release and feature branches
     if: >
       github.event.pull_request.merged == true &&
       startsWith(github.event.pull_request.head.ref, 'release/v')
@@ -19,10 +19,17 @@ jobs:
       issues: write
 
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Extract version info
         id: meta
@@ -47,34 +54,17 @@ jobs:
           echo "next_release=release/v${NEXT_VERSION}" >> $GITHUB_OUTPUT
           echo "next_feature=feature/v${NEXT_VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Delete merged release and matching feature branch
-        shell: bash
-        run: |
-          RELEASE_BRANCH="${{ steps.meta.outputs.release_branch }}"
-          FEATURE_BRANCH="${{ steps.meta.outputs.feature_branch }}"
-
-          if git ls-remote --heads origin "$RELEASE_BRANCH" | grep -q "refs/heads/${RELEASE_BRANCH}$"; then
-            git push origin --delete "$RELEASE_BRANCH"
-            echo "✅ Deleted release branch: $RELEASE_BRANCH"
-          else
-            echo "ℹ️ Release branch not found (already deleted): $RELEASE_BRANCH"
-          fi
-
-          if git ls-remote --heads origin "$FEATURE_BRANCH" | grep -q "refs/heads/${FEATURE_BRANCH}$"; then
-            git push origin --delete "$FEATURE_BRANCH"
-            echo "✅ Deleted feature branch: $FEATURE_BRANCH"
-          else
-            echo "ℹ️ Feature branch not found (skip): $FEATURE_BRANCH"
-          fi
-
       - name: Create next release and feature branches from main
         shell: bash
         run: |
           NEXT_RELEASE="${{ steps.meta.outputs.next_release }}"
           NEXT_FEATURE="${{ steps.meta.outputs.next_feature }}"
 
-          git config user.email "ci@signum-adapters.bot"
-          git config user.name "CI Bot"
+          git config user.email "ci@lazenca.bot"
+          git config user.name "Lazenca CI"
+
+          REMOTE_URL="https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}.git"
+          git remote set-url origin "$REMOTE_URL"
 
           git fetch origin main
           git checkout -B main origin/main
@@ -113,12 +103,11 @@ jobs:
               repo: context.repo.repo,
               issue_number: pr.number,
               body: [
-                `## ✅ Cleanup after main merge complete: \`${releaseVersion}\``,
+                `## ✅ Next branch creation complete: \`${releaseVersion}\``,
                 ``,
                 `| 항목 | 결과 |`,
                 `|------|------|`,
                 `| 머지된 release 브랜치 | \`${releaseBranch}\` |`,
-                `| 정리된 feature 브랜치 | \`${featureBranch}\` (있으면 삭제) |`,
                 `| 다음 릴리즈 브랜치 | \`${nextRelease}\` |`,
                 `| 다음 피처 브랜치 | \`${nextFeature}\` |`,
                 ``,
