@@ -1,19 +1,12 @@
 name: CD Docker
 
-# 자동 트리거: feature/v* → release/v* PR 머지 시
-# 수동 실행:   Actions > CD Docker > Run workflow (release/vX.Y 브랜치 선택)
+# 수동 실행 전용: Actions > CD Docker > Run workflow (release/vX.Y 브랜치 선택)
 #
-# 흐름 (자동):
-#   feature/vX.Y → release/vX.Y merge
-#     → Docker 이미지 빌드 + ghcr.io vX.Y 등록
-#     → 성공 시 release/vX.Y → main 자동 PR 생성 & 머지
-#     → cleanup-after-main-merge.yml 이 다음 브랜치 생성
+# 자동 트리거(release/v* PR 머지 시 배포)는 signum 모노레포 통합(US-10, signum#25)에
+# 따라 비활성화했다. 이 레포는 모노레포(soobo-sim/signum)로 통합되는 대상이라 배포는
+# 모노레포 쪽 파이프라인이 전담한다 — signum-data의 US-08(signum#23)과 동일한 사유.
 
 on:
-  pull_request:
-    types: [closed]
-    branches:
-      - 'release/v*'
   workflow_dispatch:
     inputs:
       deploy_env:
@@ -30,11 +23,6 @@ on:
 jobs:
   cd:
     name: Build, push registry & release to main
-    if: >
-      github.event_name == 'workflow_dispatch' || (
-        github.event.pull_request.merged == true &&
-        startsWith(github.event.pull_request.head.ref, 'feature/v')
-      )
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: ${{ github.event.inputs.deploy_env || 'production' }}
@@ -55,11 +43,7 @@ jobs:
         id: meta
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            RELEASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-          else
-            RELEASE_BRANCH="${{ github.ref_name }}"
-          fi
+          RELEASE_BRANCH="${{ github.ref_name }}"
 
           if ! echo "$RELEASE_BRANCH" | grep -qE '^release/v[0-9]+\.[0-9]+$'; then
             echo "❌ Not a managed release branch: $RELEASE_BRANCH"
@@ -122,29 +106,3 @@ jobs:
           docker manifest inspect "${{ steps.meta.outputs.image }}" > /dev/null
           echo "✅ Image verified: ${{ steps.meta.outputs.image }}"
 
-      - name: Merge release to main
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        shell: bash
-        run: |
-          RELEASE_BRANCH="${{ steps.meta.outputs.release_branch }}"
-          VERSION="${{ steps.meta.outputs.version }}"
-
-          EXISTING=$(gh pr list --head "$RELEASE_BRANCH" --base main \
-            --json number --jq '.[0].number' 2>/dev/null)
-
-          if [ -z "$EXISTING" ]; then
-            gh pr create \
-              --base main \
-              --head "$RELEASE_BRANCH" \
-              --title "[release] ${VERSION} → main" \
-              --body "Automated release merge after successful CD."
-            PR_NUM=$(gh pr list --head "$RELEASE_BRANCH" --base main \
-              --json number --jq '.[0].number')
-          else
-            PR_NUM=$EXISTING
-          fi
-
-          gh pr merge "$PR_NUM" --merge
-          echo "✅ Merged $RELEASE_BRANCH → main (PR #${PR_NUM})"
