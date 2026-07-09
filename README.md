@@ -1,5 +1,7 @@
 # signum-strategy
 
+> ⚠️ 이 레포는 [soobo-sim/signum](https://github.com/soobo-sim/signum) 모노레포로 통합되어 archive될 예정입니다. 새로운 개발은 signum 레포에서 계속됩니다.
+
 Concrete trading strategy implementations for [signum-engine](https://github.com/soobo-sim/signum-engine).
 
 ## Overview
