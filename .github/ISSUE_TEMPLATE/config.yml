@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "📐 설계 문서 (BRD · Epics · Features · HLD)"
+    url: https://github.com/soobo-sim/signum-strategy/tree/main/docs
+    about: "이슈 작성 전 반드시 확인하세요 — BRD Goal, Epic/Feature 번호가 여기 있습니다."
+  - name: "📖 서비스 README"
+    url: https://github.com/soobo-sim/signum-strategy/blob/main/README.md
+    about: "signum-strategy 전체 구조·전략 아키텍처·의존성 안내"

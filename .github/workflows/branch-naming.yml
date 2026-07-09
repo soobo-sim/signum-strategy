@@ -1,0 +1,42 @@
+name: Branch Naming
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    name: Validate branch name
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check branch name format
+        shell: bash
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          # Allowed formats:
+          #   main
+          #   release/v{major}.{minor}               e.g. release/v1.46
+          #   feature/v{major}.{minor}               e.g. feature/v1.46
+          #   feature/v{major}.{minor}_{freetext}    e.g. feature/v1.46_add-strategy
+          #   copilot/{freetext}                     e.g. copilot/fix-issue-222
+          PATTERN='^(main|release\/v[0-9]+\.[0-9]+|feature\/v[0-9]+\.[0-9]+(_[a-z0-9][a-z0-9\-]*)?|copilot\/[a-z0-9][a-z0-9\-]*)$'
+
+          if echo "$BRANCH" | grep -qE "$PATTERN"; then
+            echo "✅ Valid branch name: $BRANCH"
+          else
+            echo "❌ Invalid branch name: '$BRANCH'"
+            echo ""
+            echo "Allowed formats:"
+            echo "  main"
+            echo "  release/v{major}.{minor}              e.g. release/v1.46"
+            echo "  feature/v{major}.{minor}              e.g. feature/v1.46"
+            echo "  feature/v{major}.{minor}_{freetext}   e.g. feature/v1.46_add-strategy"
+            echo "  copilot/{freetext}                    e.g. copilot/fix-issue-222"
+            echo ""
+            echo "Rules:"
+            echo "  - major/minor must be numeric"
+            echo "  - freetext must be lowercase alphanumeric + hyphens"
+            echo "  - freetext must start with a letter or digit (not a hyphen)"
+            exit 1
+          fi

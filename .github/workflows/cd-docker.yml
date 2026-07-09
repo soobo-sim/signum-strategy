@@ -146,5 +146,5 @@ jobs:
             PR_NUM=$EXISTING
           fi
 
-          gh pr merge "$PR_NUM" --merge
+          gh pr merge "$PR_NUM" --squash
           echo "✅ Merged $RELEASE_BRANCH → main (PR #${PR_NUM})"

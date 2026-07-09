@@ -6,15 +6,16 @@
 <!-- Closes #N -->
 Closes #
 
-## implementor 자가 점검 결과
+## 자가 점검 결과
 
 | 항목 | 결과 | 근거 |
 |------|------|------|
-| Protocol 준수 (4메서드) | ✅/❌ | |
-| 격리 확인 (DB/내부 import 없음) | ✅/❌ | |
+| SSoT (단일 진실 소스) | ✅/❌ | |
+| 대칭성 (Long↔Short, Trend↔Box) | ✅/❌ | |
+| 분기 클래스화 (if side/regime 없음) | ✅/❌ | |
+| Protocol/ABC 준수 | ✅/❌ | |
+| 의존성 격리 (DB/내부 import 없음) | ✅/❌ | |
 | 하드코드 금지 | ✅/❌ | |
-| 보안 (시크릿 로그 노출 없음) | ✅/❌ | |
-| API 정확성 (서명·주문 구분) | ✅/❌ | |
 | 테스트 (FAILED 0건) | ✅/❌ | `pytest -m "not requires_api_key"` 결과: PASSED X |
 
 ## 영향 범위
